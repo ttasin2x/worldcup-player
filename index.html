@@ -52,7 +52,6 @@
             background-color: var(--accent-red); border-radius: 50%;
         }
 
-        /* স্ট্যাটাস বার */
         .status-bar {
             display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
             padding: 15px 20px 10px 20px; max-width: 800px; margin: 0 auto; gap: 10px;
@@ -61,10 +60,7 @@
         .live-indicator { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; }
         .live-dot { width: 10px; height: 10px; background-color: var(--accent-red); border-radius: 50%; }
 
-        /* নেটওয়ার্ক স্পিড ও ডেটা মিটার */
-        .net-stats {
-            display: flex; gap: 8px; font-size: 11px; font-weight: 600;
-        }
+        .net-stats { display: flex; gap: 8px; font-size: 11px; font-weight: 600; }
         .stat-badge {
             background: var(--surface-light); padding: 4px 8px; border-radius: 6px;
             color: var(--text-secondary); border: 1px solid #3f3f46;
@@ -109,24 +105,18 @@
     <div class="top-player-section">
         <div class="player-wrapper">
             <video id="video-player" playsinline controls></video>
-            
             <div class="fake-progress-bar"><div class="fake-progress-fill"></div></div>
-
             <div class="status-bar">
                 <div class="live-indicator">
                     <span class="live-dot" id="live-dot" style="display:none;"></span>
                     <span id="now-playing-text">চ্যানেল সিলেক্ট করুন</span>
                 </div>
-                
-                <!-- ডেটা ও স্পিড মিটার -->
                 <div class="net-stats" id="network-stats">
                     <span class="stat-badge">🚀 0.0 Mbps</span>
                     <span class="stat-badge">📊 0.0 MB</span>
                 </div>
-
                 <span class="engine-status" id="engine-status">Standby</span>
             </div>
-            
             <div class="category-tabs" id="category-tabs"></div>
         </div>
     </div>
@@ -161,9 +151,6 @@
         let currentShaka = null;
         let currentPlayingUrl = ''; 
         
-        // ==========================================
-        // Network Tracker (Speed & Data Usage)
-        // ==========================================
         let totalSessionBytes = 0; 
         let statTrackerInterval = null;
 
@@ -176,11 +163,7 @@
 
         function startNetworkTracking(engineType) {
             clearInterval(statTrackerInterval);
-            
-            // HLS.js এর ট্র্যাকিং সরাসরি ইভেন্ট থেকে হয়, তাই এখানে কিছু করতে হবে না
             if (engineType === 'hls') return;
-
-            // Shaka বা Native এর জন্য এস্টিমেশন (প্রতি সেকেন্ডে)
             statTrackerInterval = setInterval(() => {
                 let speed = "0.0";
                 let bytesPerSec = 0;
@@ -192,7 +175,6 @@
                     bytesPerSec = bandwidthBits / 8;
                 } 
                 else if (engineType === 'native') {
-                    // Native player fallback estimation
                     speed = navigator.connection ? navigator.connection.downlink.toFixed(1) : "1.5";
                     bytesPerSec = (parseFloat(speed) * 1000000) / 8;
                 }
@@ -204,13 +186,12 @@
             }, 1000);
         }
 
-        // ==========================================
-        // চ্যানেল ফেচ ও রেন্ডারিং
-        // ==========================================
+        // 🌟 মোট ৪টি লিংক সোর্স
         const m3uUrls = [
             'https://raw.githubusercontent.com/sanjoykb/-KB-TV-Playlist/refs/heads/main/Github%20Auto%20Update%20Channel.m3u',
             'https://raw.githubusercontent.com/ttasin2x/Playlist.m3u/refs/heads/main/Playlist.m3u',
-            'https://raw.githubusercontent.com/sm-monirulislam/Toffee-Auto-Update-Playlist/refs/heads/main/Ns_player.m3u'
+            'https://raw.githubusercontent.com/sm-monirulislam/Toffee-Auto-Update-Playlist/refs/heads/main/Ns_player.m3u',
+            'https://raw.githubusercontent.com/ahan443/FAST-IPTV/refs/heads/main/zpy8.m3u.m3u8' // নতুন যুক্ত করা লিংক
         ];
 
         let groupedChannels = {};
@@ -227,11 +208,20 @@
                         parseM3U(data);
                         successCount++;
                     }
-                } catch (error) { console.error("Fetch Error"); }
+                } catch (error) { console.error("Fetch Error: ", url); }
             }
 
+            // স্পেশাল লিংকটি ম্যানুয়ালি যুক্ত করা হলো
+            const specialChannel = { 
+                name: "🔥 Premium Live", 
+                url: "https://andro.evrenesoglu57.click/checklist/androstreamliveexn4.m3u8" 
+            };
+            
+            if (!groupedChannels['Sports']) groupedChannels['Sports'] = [];
+            groupedChannels['Sports'].push(specialChannel);
+
             if (successCount > 0) {
-                fetchStatus.innerText = `Updated ✅`; fetchStatus.style.color = "#4ade80";
+                fetchStatus.innerText = `Updated ✅ (${successCount}/${m3uUrls.length})`; fetchStatus.style.color = "#4ade80";
                 buildCategoryTabs(); renderChannels('All'); 
             } else {
                 fetchStatus.innerText = "Failed ❌"; fetchStatus.style.color = "#f87171";
@@ -285,14 +275,17 @@
                 ? Object.values(groupedChannels).flat() 
                 : [...(groupedChannels[category] || [])];
 
-            function getPriorityWeight(name) {
+            function getPriorityWeight(name, url) {
+                if (url.includes('androstreamliveexn4')) return 0; 
+                
                 const lower = name.toLowerCase();
                 if (lower.includes('toffee')) return 1;
                 if (lower.includes('t sports') || lower.includes('tsports')) return 2;
-                return 3;
+                
+                return 3; 
             }
 
-            channelsToShow.sort((a, b) => getPriorityWeight(a.name) - getPriorityWeight(b.name));
+            channelsToShow.sort((a, b) => getPriorityWeight(a.name, a.url) - getPriorityWeight(b.name, b.url));
 
             channelsToShow.forEach(ch => {
                 const card = document.createElement('div');
@@ -359,7 +352,6 @@
                     startNetworkTracking('hls');
                 });
 
-                // HLS.js এর ১০০% সঠিক ডেটা ট্র্যাকার
                 currentHls.on(Hls.Events.FRAG_LOADED, (event, data) => {
                     let chunkBytes = data.frag.stats.total;
                     totalSessionBytes += chunkBytes;
